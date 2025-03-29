@@ -1,0 +1,120 @@
+
+/* VS2019 Light Theme */
+pre[class*="language-"] {
+    border: 1px solid #DDDDDD; /* Outer border only */
+    background: #F8F8F8;
+    padding: 1.25em 1em;
+    margin: 1.5rem 0;
+    overflow: auto;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05); /* Subtle depth */
+}
+
+code[class*="language-"] {
+    color: #1E1E1E;
+    background: transparent !important; /* Remove code background */
+    font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    text-align: left;
+    white-space: pre;
+    word-spacing: normal;
+    word-break: normal;
+    tab-size: 4;
+    hyphens: none;
+    display: block; /* makes code element fill container */
+}
+
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+    color: #008000; /* Green comments */
+    font-style: italic;
+}
+
+.token.punctuation {
+    color: #393A34; /* Dark gray punctuation */
+}
+
+.token.namespace {
+    opacity: 0.7;
+}
+
+.token.keyword,
+.token.boolean,
+.token.constant,
+.token.deleted {
+    color: #0000FF; /* Blue keywords */
+}
+
+.token.number {
+    color: #098658; /* Green numbers */
+}
+
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+    color: #A31515; /* Maroon strings */
+}
+
+.token.operator {
+    color: #393A34; /* Dark gray operators */
+}
+
+.token.function,
+.token.function-variable {
+    color: #795E26; /* Brown functions */
+}
+
+.token.class-name,
+.token.type-reference {
+    color: #267F99; /* Teal class names */
+}
+
+.token.parameter {
+    color: #001080; /* Dark blue parameters */
+}
+
+.token.tag {
+    color: #0000FF; /* Blue tags */
+}
+
+.token.attr-name {
+    color: #001080; /* Dark blue attributes */
+}
+
+.token.attr-value {
+    color: #A31515; /* Maroon attribute values */
+}
+
+.token.variable {
+    color: #0070C1; /* Medium blue variables */
+}
+
+.token.constant {
+    color: #0070C1; /* Medium blue constants */
+}
+
+.token.regex,
+.token.important {
+    color: #FF0000; /* Red regex/important */
+}
+
+.token.selector {
+    color: #800000; /* Dark red selectors */
+}
+
+.token.url {
+    color: #393A34; /* Dark gray URLs */
+}
+
+/* Inline code styling */
+.code-inline {
+    background-color: #F1F1F1;
+    font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+    font-size: 0.85em;
+    padding: 2px 6px;
+    color: #1E1E1E;
+}
