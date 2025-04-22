@@ -135,10 +135,11 @@
         <source src="../assets/posts/visualizing-solution-spaces/simple-32x32-brute-force.mp4" type="video/mp4">
     </video>
     <p>
-        Starting small, I first brute-forced a 32x32 grid of chassis positions (X/Y).
+        Starting small, I first brute-forced a 32x32 grid of chassis XY positions.
+        The chassis position is restricted to the area just above and between the wheels.
+        The third parameter is ignored for now.
         The video above shows each solution being tested sequentially, with fitness written to the texture on the left.
         After brute forcing all solutions, it shows the best solution it found.
-        Parameter ranges are constrained to physically plausible positions (e.g., chassis not buried underground).
     </p>
     <br>
 
@@ -146,8 +147,14 @@
         <source src="../assets/posts/visualizing-solution-spaces/chassis-XYR-2-powered-wheels.mp4" type="video/mp4">
     </video>
     <p>
-        Scaling to 512x512 resolution and adding the third parameter (chassis radius), the above video shows a highly detailed visualization of a 3D solution space.
-        The chassis radius starts small and grows incrementally each frame.
+        Adding the third parameter (chassis radius) expands the solution space to three dimensions.
+        The 3D solution space is visualized in the video seen above,
+        where each frame represents a continuous variation in the chassis radius.
+        The chassis radius starts smaller than the wheels in the first frame and gradually increases to slightly larger than the wheels by the final frame.
+        The video has a resolution of 512x512 which allows us to see in detail just how complex this multidimensional landscape is.
+
+        To make sense of the above video in simple terms:
+        It shows you how large the chassis should be and where the chassis should be placed in order to get the best possible score for the car.
     </p>
     <br>
 
@@ -155,7 +162,8 @@
         <source src="../assets/posts/visualizing-solution-spaces/zoomed-out-chassis-XYR.mp4" type="video/mp4">
     </video>
     <p>
-        Out of curiosity, I expanded the parameter range of the chassis XY position so much that it allowed chassis placements far above or below the terrain.
+        Out of curiosity, I allowed the chassis position to be placed much farther away from the wheels,
+        even so far away that it could intersect with the terrain.
         That's why you can see a bit of terrain inside this solution space.
         Surprisingly, many of these configurations scored well despite seeming impractical—why would placing the chassis underneath the terrain or far up in the sky score highly?
     </p>
