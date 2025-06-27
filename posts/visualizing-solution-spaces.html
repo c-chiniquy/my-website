@@ -101,13 +101,13 @@
         So I came up with the idea to plot one, pixel by pixel.
         Obviously, that's not feasible for high dimensions. Not only would it take too long to calculate the fitness of every solution,
         but you can only visualize up to three dimensions on a screen without distortion.
-        A brute-force approach like this would only be feasible if applied to at most three parameters at a time.
+        A brute-force approach like this is only feasible if applied to at most three parameters at a time.
     </p>
 
     <h2>Implementation</h2>
     <img src="../assets/posts/visualizing-solution-spaces/car.png" alt="Car" class="blog-image">
     <p>
-        To test this idea, I designed an optimization problem involving a car driving on rough terrain in a 2D environment.
+        To test this idea, I need an optimization problem. So I designed one involving a car driving on rough terrain in a 2D environment.
         The car consists of three circular bodies: two wheels and a red chassis.
         The goal is to optimize the chassis’s position (XY coordinates) and radius to maximize how far the car travels within a fixed time.
         The terrain is randomly generated and remains consistent across all trials.
