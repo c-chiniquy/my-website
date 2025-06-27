@@ -140,6 +140,7 @@
         The third parameter is ignored for now.
         The video above shows each solution being tested sequentially, with fitness written to the texture on the left.
         After brute forcing all solutions, it shows the best solution it found.
+        The fitness texture on the left shows an undistorted visualization of this solution space, albeit at low resolution.
     </p>
     <br>
 
@@ -152,6 +153,7 @@
         where each frame represents a continuous variation in the chassis radius.
         The chassis radius starts smaller than the wheels in the first frame and gradually increases to slightly larger than the wheels by the final frame.
         The video has a resolution of 512x512 which allows us to see in detail just how complex this multidimensional landscape is.
+        Just look at all that math happening in there! It looks quite complex, doesn't it?
     </p>
     <p>
         To make sense of the above video in simple terms:
@@ -163,6 +165,7 @@
         <source src="../assets/posts/visualizing-solution-spaces/zoomed-out-chassis-XYR.mp4" type="video/mp4">
     </video>
     <p>
+        In the video above, we see a more "zoomed out" view.
         Out of curiosity, I allowed the chassis position to be placed much farther away from the wheels,
         even so far away that it could intersect with the terrain.
         That's why you can see a bit of terrain inside this solution space.
