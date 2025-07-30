@@ -581,6 +581,44 @@ cmd.DrawInstanced(4, numQuads);
         In the <i>Rendering Only</i> benchmarks, the CPU does not update or write anything.
     </p>
 
+    <h2>Vulkan Update</h2>
+    <p>
+        Since publishing this post, I have added support for Vulkan in <i>iglo</i>.
+        With that, I re-ran all quad rendering benchmarks using both the D3D12 and Vulkan backends on a <b>NVIDIA GeForce RTX 3050</b>.
+        The results show Vulkan performing roughly equal to D3D12; worse on the CPU-heavy tests, but better on the rendering-only tests.
+    </p>
+    <table class="simple-table">
+        <thead>
+            <tr>
+                <th>Benchmark</th>
+                <th>D3D12 (FPS)</th>
+                <th>Vulkan (FPS)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td>Baseline (no quads)</td><td>2986.0</td><td>5502.4</td></tr>
+            <tr><td>One draw call per quad</td><td>16.8</td><td>12.4</td></tr>
+            <tr><td>Batched Triangle List</td><td>43.2</td><td>37.0</td></tr>
+            <tr><td>Dynamic Index Buffer</td><td>42.6</td><td>38.2</td></tr>
+            <tr><td>Static Index Buffer</td><td>60.2</td><td>51.8</td></tr>
+            <tr><td>Raw Vertex Pulling</td><td>163.6</td><td>162.8</td></tr>
+            <tr><td>Structured Vertex Pulling</td><td>164.0</td><td>138.0</td></tr>
+            <tr><td>Instancing</td><td>174.6</td><td>149.0</td></tr>
+            <tr><td>Rendering only (Batched)</td><td>567.0</td><td>627.0</td></tr>
+            <tr><td>Rendering only (Index Buffer)</td><td>571.0</td><td>624.8</td></tr>
+            <tr><td>Rendering only (Raw Vertex Pulling)</td><td>586.2</td><td>655.2</td></tr>
+            <tr><td>Rendering only (Structured Vertex Pulling)</td><td>587.8</td><td>651.6</td></tr>
+            <tr><td>Rendering only (Instancing)</td><td>673.4</td><td>786.2</td></tr>
+        </tbody>
+    </table>
+    <p>
+        The core concepts discussed in this post translated well to Vulkan.
+        The Vulkan equivalent of D3D12's Raw and Structured Buffers are called <i>Storage Buffers</i>.
+        Unfortunately, Vulkan requires an 8-byte alignment for structured buffers, so I had to add padding to the Quad struct in the Vulkan structured buffer benchmark tests.
+        A larger struct means more data to write and transfer each frame.
+        That's why structured buffers performed worse than raw buffers in the Vulkan benchmarks.
+    </p>
+
     <h2>Conclusion</h2>
     <p>
         In the benchmarks, we see that when the CPU is tasked to update and write vertex data every frame, then instancing is tied with vertex pulling.
