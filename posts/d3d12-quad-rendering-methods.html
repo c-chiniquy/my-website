@@ -1,0 +1,657 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Many Ways to Render Quads in D3D12</title>
+
+    <link href="../assets/prism/prism.css" rel="stylesheet" />
+    <link href="../assets/prism/vs2019-cpp-style.css" rel="stylesheet" />
+
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            max-width: 720px;
+            margin: 0 auto;
+            color: #333;
+        }
+
+        .blog-image {
+            display: block;
+            margin: 0 auto;
+            width: 100%;
+            height: auto;
+        }
+
+        .post-date {
+            color: #666;
+            text-align: center;
+            margin-top: 1rem;
+            margin-bottom: 2.5rem;
+        }
+
+        .back-link {
+            margin-top: 3rem;
+            text-align: center;
+        }
+
+            .back-link a {
+                color: #2266dd;
+                text-decoration: none;
+            }
+
+        pre {
+            background-color: #f5f5f5;
+            padding: 1rem;
+            overflow-x: auto;
+            border-radius: 8px;
+        }
+
+        h1 {
+            font-size: 2.2rem;
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            margin-bottom: 0rem;
+        }
+
+        p {
+            margin-top: 0.25rem;
+        }
+
+        img + p, a + p {
+            margin-top: 0.75rem;
+        }
+
+        h1 + img, h2 + img, h3 + img, h4 + img, h5 + img, h6 + img {
+            margin-top: 0.55rem !important;
+        }
+
+        h1 + p, h2 + p, h3 + p, h4 + p, h5 + p, h6 + p {
+            margin-top: 0.1rem;
+        }
+
+        p + h1, p + h2, p + h3, p + h4, p + h5, p + h6 {
+            margin-top: 1.5rem;
+        }
+    </style>
+
+    <style>
+        details {
+            margin: 1rem 0;
+        }
+
+        summary {
+            padding: 0.5rem;
+            cursor: pointer;
+            background-color: #f2f2f2;
+        }
+
+            summary:hover {
+                background-color: #e8e8e8;
+            }
+
+        pre {
+            margin: 0;
+            border-radius: 0 0 4px 4px;
+        }
+    </style>
+
+    <style>
+        .simple-table {
+            width: auto;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            font-size: 14px;
+            font-family: 'Consolas', 'Menlo', 'Monaco', 'Courier New', monospace;
+        }
+
+            .simple-table th,
+            .simple-table td {
+                padding: 6px 12px;
+                border: 1px solid #DDD;
+                text-align: left;
+            }
+
+            .simple-table th {
+                background-color: #F8F8F8;
+                border-bottom: 2px solid #CCC;
+            }
+    </style>
+
+</head>
+<body>
+    <h1>The Many Ways to Render Quads in D3D12</h1>
+    <div class="post-date">Posted: March 25, 2025</div>
+
+    <h2>Introduction</h2>
+    <p>
+        In this post, I'll demonstrate several methods to render quads in D3D12.
+        I will also present benchmarks that show which method has the best performance.
+        These methods probably also work for Vulkan, as both APIs are low-level and have similar capabilities.
+    </p>
+    <p>
+        When I was developing my rendering abstraction layer <i>iglo</i>, I wanted to know what the most efficient method to render quads is.
+        Most 2D graphics are rendered in the form of quads (such as sprites, UI elements, or particles).
+        I have quite a few projects that need to render 2D graphics, so I thought this was worth investigating.
+    </p>
+
+    <h2>The Basics</h2>
+    <p>
+        Rendering 2D graphics differs a bit from rendering static 3D graphics.
+        For 3D meshes, it is expected that you upload the vertex data to a default heap when the scene first loads, and render the meshes from there.
+        This is because the GPU can read vertex data much faster from default heaps (VRAM) than upload heaps (RAM).
+        Uploading vertex data to a default heap requires that you first write it to an upload heap, then issue a copy command to the GPU to copy that data to a default heap.
+        With complex meshes that don't update often, this approach makes sense.
+        For 2D graphics however, vertices may need to be updated every frame.
+        That's why it's standard practice to just render vertices directly from an upload heap when rendering 2D graphics.
+        The frame cycle of rendering sprites goes like this:
+    </p>
+    <ol>
+        <li>CPU updates the size/location of sprites as part of game physics.</li>
+        <li>CPU writes new vertices to upload heap (RAM).</li>
+        <li>GPU reads from the upload heap and renders the sprites.</li>
+    </ol>
+
+    <h2>Method #1: One draw call per quad</h2>
+    <p>
+        The simplest but slowest method to draw quads is to write 6 vertices per quad, with one draw call per quad.
+        It takes 2 triangles to make a quad, and each triangle consists of 3 vertices.
+        The code below shows this method implemented in iglo.
+        What's nice about using a rendering abstraction layer is that it hides a lot of the D3D12 boilerplate.
+    </p>
+
+<pre><code class="language-cpp">cmd.SetPipeline(pipeline);
+cmd.SetPrimitiveTopology(ig::Primitive::TriangleList);
+
+for (uint32_t i = 0; i < numQuads; i++)
+{
+    Vertex data[6] =
+    {
+        {quad[i].x, quad[i].y, quad[i].color},
+        {quad[i].x + quad[i].width, quad[i].y, quad[i].color},
+        {quad[i].x, quad[i].y + quad[i].height, quad[i].color},
+        {quad[i].x, quad[i].y + quad[i].height, quad[i].color},
+        {quad[i].x + quad[i].width, quad[i].y, quad[i].color},
+        {quad[i].x + quad[i].width, quad[i].y + quad[i].height, quad[i].color},
+    };
+    cmd.SetTempVertexBuffer(&data, sizeof(data), sizeof(Vertex));
+    cmd.Draw(6);
+}
+</code></pre>
+    <p>
+        The code is fairly simple.
+        For every quad we render, we write 6 vertices and issue a draw call to draw 6 vertices.
+        The iglo function <code class="code-inline">SetTempVertexBuffer()</code> copies the vertex data to an upload heap that is automatically managed by iglo,
+        and then binds that memory region to the input assembler.
+    </p>
+
+    <h2>Method #2: Batched Triangle List</h2>
+    <p>
+        Batching all triangles together into the same draw call improves performance significantly.
+        Although faster than the previous method, the CPU must still write 6 vertices per quad every frame.
+    </p>
+
+<pre><code class="language-cpp">// Initialization
+std::vector&lt;Vertex&gt; vertices = std::vector&lt;Vertex&gt;(numQuads * 6);
+ig::Buffer vertexBuffer;
+vertexBuffer.LoadAsVertexBuffer(context, sizeof(Vertex), numQuads * 6, ig::BufferUsage::Dynamic);
+
+...
+
+// Rendering
+uint32_t currentVertex = 0;
+for (uint32_t i = 0; i < numQuads; i++)
+{
+	vertices[currentVertex] = { quad[i].x, quad[i].y, quad[i].color };
+	vertices[currentVertex + 1] = { quad[i].x + quad[i].width, quad[i].y, quad[i].color };
+	vertices[currentVertex + 2] = { quad[i].x, quad[i].y + quad[i].height, quad[i].color };
+	vertices[currentVertex + 3] = { quad[i].x, quad[i].y + quad[i].height, quad[i].color };
+	vertices[currentVertex + 4] = { quad[i].x + quad[i].width, quad[i].y, quad[i].color };
+	vertices[currentVertex + 5] = { quad[i].x + quad[i].width, quad[i].y + quad[i].height, quad[i].color };
+	currentVertex += 6;
+}
+vertexBuffer.SetDynamicData(vertices.data());
+
+cmd.SetPipeline(pipeline);
+cmd.SetVertexBuffer(vertexBuffer);
+cmd.SetPrimitiveTopology(ig::Primitive::TriangleList);
+cmd.Draw(vertexBuffer.GetNumElements());
+</code></pre>
+
+    <p>
+        Here we create and use a vertex buffer large enough to contain all vertices we need.
+        In iglo, buffers created with <code class="code-inline">ig::BufferUsage::Dynamic</code> are upload heaps, and <code class="code-inline">ig::BufferUsage::Default</code> are default heaps.
+        <code class="code-inline">SetDynamicData()</code> populates a dynamic buffer with data.
+    </p>
+
+    <p>
+        Every method I list hereafter can be considered more advanced forms of batching, as they also draw all quads in the same draw call.
+    </p>
+
+    <h2>Method #3: Index buffer</h2>
+    <p>
+        With this method we use an index buffer alongside our vertex buffer.
+        With an index buffer, we now only need to write 4 vertices per quad instead of 6.
+        This means less CPU usage and less CPU->GPU bandwidth is used.
+        Using index buffers to draw quads used to be the most common quad rendering method back in the days of fixed function pipelines (OpenGL/D3D9).
+        It might still be the most common method, who knows.
+        It's certainly the most backward compatible method that is still reasonably fast.
+        You can either use a static index buffer with pre-filled values or a dynamic index buffer.
+        If you know you are only going to be drawing quads, it's best to use a static index buffer with pre-filled values.
+    </p>
+    <details>
+        <summary><b>Dynamic</b> index buffer code</summary>
+<pre><code class="language-cpp">// Initialization
+std::vector&lt;Vertex&gt; vertices = std::vector&lt;Vertex&gt;(numQuads * 4);
+std::vector&lt;uint32_t&gt; indices = std::vector&lt;uint32_t&gt;(numQuads * 6);
+
+ig::Buffer vertexBuffer;
+ig::Buffer indexBuffer;
+vertexBuffer.LoadAsVertexBuffer(context, sizeof(Vertex), numQuads * 4, ig::BufferUsage::Dynamic);
+indexBuffer.LoadAsIndexBuffer(context, ig::IndexFormat::UINT32, numQuads * 6, ig::BufferUsage::Dynamic);
+
+...
+
+// Rendering
+uint32_t currentVertex = 0;
+uint32_t currentIndex = 0;
+for (uint32_t i = 0; i < numQuads; i++)
+{
+	vertices[currentVertex] = { quad[i].x, quad[i].y, quad[i].color };
+	vertices[currentVertex + 1] = { quad[i].x + quad[i].width, quad[i].y, quad[i].color };
+	vertices[currentVertex + 2] = { quad[i].x, quad[i].y + quad[i].height, quad[i].color };
+	vertices[currentVertex + 3] = { quad[i].x + quad[i].width, quad[i].y + quad[i].height, quad[i].color };
+
+	uint32_t baseVertex = currentVertex;
+	indices[currentIndex] = baseVertex;
+	indices[currentIndex + 1] = baseVertex + 1;
+	indices[currentIndex + 2] = baseVertex + 2;
+	indices[currentIndex + 3] = baseVertex + 2;
+	indices[currentIndex + 4] = baseVertex + 1;
+	indices[currentIndex + 5] = baseVertex + 3;
+
+	currentVertex += 4;
+	currentIndex += 6;
+}
+vertexBuffer.SetDynamicData(vertices.data());
+indexBuffer.SetDynamicData(indices.data());
+
+cmd.SetPipeline(pipeline);
+cmd.SetVertexBuffer(vertexBuffer);
+cmd.SetIndexBuffer(indexBuffer);
+cmd.SetPrimitiveTopology(ig::Primitive::TriangleList);
+cmd.DrawIndexed(indexBuffer.GetNumElements());
+</code></pre>
+    </details>
+
+    <details>
+        <summary><b>Static</b> index buffer code</summary>
+<pre><code class="language-cpp">// Initialization
+std::vector&lt;Vertex&gt; vertices = std::vector&lt;Vertex&gt;(numQuads * 4);
+
+vertexBuffer.LoadAsVertexBuffer(context, sizeof(Vertex), numQuads * 4, ig::BufferUsage::Dynamic);
+indexBuffer.LoadAsIndexBuffer(context, ig::IndexFormat::UINT32, numQuads * 6, ig::BufferUsage::Default);
+
+// Populate the index buffer at initialization.
+std::vector&lt;uint32_t&gt; indices(numQuads * 6);
+for (uint32_t quadIndex = 0; quadIndex < numQuads; quadIndex++)
+{
+	uint32_t baseVertex = quadIndex * 4;  // 4 vertices per quad
+	uint32_t indexOffset = quadIndex * 6;  // 6 indices per quad
+
+	indices[indexOffset] = baseVertex;
+	indices[indexOffset + 1] = baseVertex + 1;
+	indices[indexOffset + 2] = baseVertex + 2;
+	indices[indexOffset + 3] = baseVertex + 2;
+	indices[indexOffset + 4] = baseVertex + 1;
+	indices[indexOffset + 5] = baseVertex + 3;
+}
+indexBuffer.SetData(cmd, indices.data());
+
+...
+
+// Rendering
+uint32_t currentVertex = 0;
+for (uint32_t i = 0; i < numQuads; i++)
+{
+	vertices[currentVertex] = { quad[i].x, quad[i].y, quad[i].color };
+	vertices[currentVertex + 1] = { quad[i].x + quad[i].width, quad[i].y, quad[i].color };
+	vertices[currentVertex + 2] = { quad[i].x, quad[i].y + quad[i].height, quad[i].color };
+	vertices[currentVertex + 3] = { quad[i].x + quad[i].width, quad[i].y + quad[i].height, quad[i].color };
+	currentVertex += 4;
+}
+vertexBuffer.SetDynamicData(vertices.data());
+
+cmd.SetPipeline(pipeline);
+cmd.SetVertexBuffer(vertexBuffer);
+cmd.SetIndexBuffer(indexBuffer);
+cmd.SetPrimitiveTopology(ig::Primitive::TriangleList);
+cmd.DrawIndexed(indexBuffer.GetNumElements());
+</code></pre>
+    </details>
+
+    <h2>Method #4: Vertex Pulling</h2>
+    <p>
+        Vertex pulling generates vertex data algorithmically in the shader, bypassing conventional vertex buffers.
+        You "pull vertices out of the air" so to speak.
+        To render quads, you issue a draw call to draw 6 times as many vertices as you have quads,
+        then in the shader you use <code class="code-inline">uint vertexID : SV_VertexID</code> to know which quad and what corner each vertex belongs to.
+        The shader then reads from a raw or structured buffer containing all quad data and then constructs every vertex based on that.
+        This method doesn't use the input assembler, so we don't call <code class="code-inline">SetVertexBuffer()</code>.
+    </p>
+    <p>
+        What's nice about this method is that the CPU only needs to write 20 bytes per quad (x, y, width, height, color).
+        Compare that to previous methods that need 6 vertices per quad (72 bytes) or 4 vertices per quad (48 bytes).
+    </p>
+
+    <details>
+        <summary><b>Structured buffer</b> vertex pulling shader (HLSL)</summary>
+<pre><code class="language-cpp">cbuffer PushConstants : register(b0)
+{
+	uint structuredBufferIndex;
+}
+
+struct Quad // Per-quad data
+{
+	float2 position;
+	float width;
+	float height;
+	uint color;
+};
+
+float4 ConvertToFloat4(uint color32)
+{
+	return float4(
+		(float)(color32 & 0xFF) / 255.0f,
+		(float)((color32 >> 8) & 0xFF) / 255.0f,
+		(float)((color32 >> 16) & 0xFF) / 255.0f,
+		(float)((color32 >> 24) & 0xFF) / 255.0f);
+}
+
+PixelInput VSMain(uint vertexID : SV_VertexID)
+{
+    // This requires D3D12 and shader model 6.6 or higher
+    StructuredBuffer&lt;Quad&gt; structuredBuffer = ResourceDescriptorHeap[structuredBufferIndex];
+
+	uint elementIndex = (vertexID / 6);
+	uint vertexIndex = (vertexID % 6);
+
+	Quad quad = structuredBuffer[elementIndex];
+
+	float2 vertexPos[6] = { float2(0, 0), float2(quad.width, 0), float2(0, quad.height),
+                         float2(0, quad.height), float2(quad.width, 0), float2(quad.width, quad.height) };
+	float2 finalPos = quad.position + vertexPos[vertexIndex];
+
+    // Convert to screen-space coords here if needed
+
+	PixelInput output;
+	output.position = float4(finalPos, 0.0f, 1.0f);
+	output.color = ConvertToFloat4(quad.color);
+
+	return output;
+}
+</code></pre>
+    </details>
+    <details>
+        <summary><b>Raw buffer</b> vertex pulling shader (HLSL)</summary>
+<pre><code class="language-cpp">cbuffer PushConstants : register(b0)
+{
+	uint rawBufferIndex;
+}
+
+struct Quad // Per-quad data
+{
+	float2 position;
+	float width;
+	float height;
+	uint color;
+};
+
+float4 ConvertToFloat4(uint color32)
+{
+	return float4(
+		(float)(color32 & 0xFF) / 255.0f,
+		(float)((color32 >> 8) & 0xFF) / 255.0f,
+		(float)((color32 >> 16) & 0xFF) / 255.0f,
+		(float)((color32 >> 24) & 0xFF) / 255.0f);
+}
+
+PixelInput VSMain(uint vertexID : SV_VertexID)
+{
+    // This requires D3D12 and shader model 6.6 or higher
+    ByteAddressBuffer rawBuffer = ResourceDescriptorHeap[rawBufferIndex];
+
+	uint elementIndex = (vertexID / 6);
+	uint vertexIndex = (vertexID % 6);
+    uint elementSize = 5 * 4;
+	uint offset = elementSize * elementIndex;
+
+    Quad quad;
+    quad.position = asfloat(rawBuffer.Load2(offset));
+	quad.width = asfloat(rawBuffer.Load(offset + 8));
+	quad.height = asfloat(rawBuffer.Load(offset + 12));
+	quad.color = rawBuffer.Load(offset + 16);
+
+	float2 vertexPos[6] = { float2(0, 0), float2(quad.width, 0), float2(0, quad.height),
+                         float2(0, quad.height), float2(quad.width, 0), float2(quad.width, quad.height) };
+	float2 finalPos = quad.position + vertexPos[vertexIndex];
+
+    // Convert to screen-space coords here if needed
+
+	PixelInput output;
+	output.position = float4(finalPos, 0.0f, 1.0f);
+	output.color = ConvertToFloat4(quad.color);
+
+	return output;
+}
+</code></pre>
+    </details>
+
+    <h2>Method #5: Instancing</h2>
+    <p>
+        Instancing is a technique that renders multiple copies of the same object efficiently using unique per-instance data.
+        Historically, instancing was expected to perform well only on complex meshes.
+        But recent advancements in hardware has improved instancing to the point were simple meshes such as quads can now use instancing without any performance problems.
+    </p>
+    <p>
+        With this method, the CPU writes per-quad data (x, y, width, height, color) which is the same amount of data as the vertex pulling method.
+        Instancing relies on the input assembler, so a vertex buffer is required.
+    </p>
+
+    <details>
+        <summary>Instancing vertex shader (HLSL)</summary>
+<pre><code class="language-cpp">struct Quad // Per-instance data
+{
+	float2 position : POSITION;
+	float width : WIDTH;
+	float height : HEIGHT;
+	float4 color : COLOR; // The input assembler does the uint->float4 conversion for us.
+};
+
+PixelInput VSMain(Quad quad, uint vertexID : SV_VertexID)
+{
+    // Assuming you're using triangle strips.
+	float2 vertexPos[4] = { float2(0, 0), float2(quad.width, 0),
+                            float2(0, quad.height), float2(quad.width, quad.height) };
+	float2 finalPos = quad.position + vertexPos[vertexID];
+
+	// Convert to screen-space coords here if needed
+
+    PixelInput output;
+	output.position = float4(finalPos, 0.0f, 1.0f);
+	output.color = quad.color;
+
+	return output;
+}
+</code></pre>
+    </details>
+    <details>
+        <summary>Instancing code (API)</summary>
+<pre><code class="language-cpp">// Initialization
+ig::Buffer vertexBuffer.LoadAsVertexBuffer(context, sizeof(Quad), numQuads, ig::BufferUsage::Dynamic);
+
+const std::vector&lt;ig::VertexElement&gt; vertexLayout =
+{
+	ig::VertexElement(ig::Format::FLOAT_FLOAT, "POSITION", 0, 0, ig::InputClass::PerInstance, 1),
+	ig::VertexElement(ig::Format::FLOAT, "WIDTH", 0, 0, ig::InputClass::PerInstance, 1),
+	ig::VertexElement(ig::Format::FLOAT, "HEIGHT", 0, 0,ig::InputClass::PerInstance, 1),
+	ig::VertexElement(ig::Format::BYTE_BYTE_BYTE_BYTE, "COLOR", 0, 0, ig::InputClass::PerInstance, 1),
+};
+
+ig::PipelineDesc desc;
+// ...set all renderstates here...
+desc.primitiveTopology = ig::Primitive::TriangleStrip; // Use triangle strips
+desc.vertexLayout = vertexLayout; // Use a per-instance vertex layout
+pipeline.Load(context, desc);
+
+...
+
+// Rendering
+vertexBuffer.SetDynamicData((void*)quad); // Populates the vertex buffer with per-instance data
+
+cmd.SetPipeline(pipeline);
+cmd.SetVertexBuffer(vertexBuffer);
+cmd.SetPrimitiveTopology(ig::Primitive::TriangleStrip);
+cmd.DrawInstanced(4, numQuads);
+</code></pre>
+    </details>
+
+    <h2>Benchmarks</h2>
+
+    <table class="simple-table">
+        <thead>
+            <tr>
+                <th>Method</th>
+                <th>FPS (CPU updates)</th>
+                <th>FPS (Rendering only)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Baseline (no quads rendered)</td>
+                <td>-</td>
+                <td>7861.6</td>
+            </tr>
+            <tr>
+                <td>One Draw Call Per Quad</td>
+                <td>17.2</td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td>Batched Triangle List</td>
+                <td>43.6</td>
+                <td>364.8</td>
+            </tr>
+            <tr>
+                <td>Dynamic Index Buffer</td>
+                <td>42.6</td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td>Static Index Buffer</td>
+                <td>60.6</td>
+                <td>363.6</td>
+            </tr>
+            <tr>
+                <td>Raw Vertex Pulling</td>
+                <td>178.2</td>
+                <td>363.0</td>
+            </tr>
+            <tr>
+                <td>Structured Vertex Pulling</td>
+                <td>178.6</td>
+                <td>363.4</td>
+            </tr>
+            <tr>
+                <td>Instancing</td>
+                <td>178.6</td>
+                <td>459.0</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <p>
+        In these benchmarks, <b>1 million quads</b> are rendered per frame, where higher FPS indicates better performance.
+        These benchmarks ran on a <b>NVIDIA GTX 1050</b> with D3D12 as rendering backend.
+        In the <i>CPU updates</i> benchmarks, the CPU updates the location of all quads and writes quad/vertex data to an upload heap every frame.
+        In the <i>Rendering Only</i> benchmarks, the CPU does not update or write anything.
+    </p>
+
+    <h2>Vulkan Update</h2>
+    <p>
+        Since publishing this post, I have added support for Vulkan in <i>iglo</i>.
+        With that, I re-ran all quad rendering benchmarks using both the D3D12 and Vulkan backends on a <b>NVIDIA RTX 3050</b>.
+        The results show roughly equal performance between the two. Vulkan performed worse on the CPU-heavy tests, but better on the rendering-only tests.
+    </p>
+    <table class="simple-table">
+        <thead>
+            <tr>
+                <th>Benchmark</th>
+                <th>D3D12 (FPS)</th>
+                <th>Vulkan (FPS)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td>Baseline (no quads)</td><td>2986.0</td><td>5502.4</td></tr>
+            <tr><td>One draw call per quad</td><td>16.8</td><td>12.4</td></tr>
+            <tr><td>Batched Triangle List</td><td>43.2</td><td>37.0</td></tr>
+            <tr><td>Dynamic Index Buffer</td><td>42.6</td><td>38.2</td></tr>
+            <tr><td>Static Index Buffer</td><td>60.2</td><td>51.8</td></tr>
+            <tr><td>Raw Vertex Pulling</td><td>163.6</td><td>162.8</td></tr>
+            <tr><td>Structured Vertex Pulling</td><td>164.0</td><td>138.0</td></tr>
+            <tr><td>Instancing</td><td>174.6</td><td>149.0</td></tr>
+            <tr><td>Rendering only (Batched)</td><td>567.0</td><td>627.0</td></tr>
+            <tr><td>Rendering only (Index Buffer)</td><td>571.0</td><td>624.8</td></tr>
+            <tr><td>Rendering only (Raw Vertex Pulling)</td><td>586.2</td><td>655.2</td></tr>
+            <tr><td>Rendering only (Structured Vertex Pulling)</td><td>587.8</td><td>651.6</td></tr>
+            <tr><td>Rendering only (Instancing)</td><td>673.4</td><td>786.2</td></tr>
+        </tbody>
+    </table>
+    <p>
+        The core concepts discussed in this post translated well to Vulkan.
+        The Vulkan equivalent of D3D12's Raw and Structured Buffers are called <i>Storage Buffers</i>.
+        Unfortunately, Vulkan requires an 8-byte alignment for structured buffers, so I had to add padding to the Quad struct in the Vulkan structured buffer benchmark tests.
+        A larger struct means more data to write and transfer each frame.
+        That's why structured buffers performed worse than raw buffers in the Vulkan benchmarks.
+    </p>
+
+    <h2>Conclusion</h2>
+    <p>
+        In the benchmarks, we see that when the CPU is tasked to update and write vertex data every frame, then instancing is tied with vertex pulling.
+        This is because instancing and vertex pulling require the same quantity of data to be written by the CPU, and since the CPU is the bottleneck, it shows these methods as tied in performance.
+        But if you look at the rendering-only benchmarks, you can see that instancing’s rendering performance outperforms the others.
+        <b>Instancing appears to be the fastest quad rendering method</b>.
+    </p>
+
+    <p>
+        Another key takeaway from the benchmarks is that relying on the CPU to update and write vertex data every frame will cause the CPU to act as a major bottleneck.
+        You can avoid this bottleneck by utilizing the GPU to update and write the vertices instead.
+        This can be done with the help of compute shaders.
+        However, it's not always feasible to offload parts of the game physics to the GPU.
+        It will depend on how complex the game physics are.
+    </p>
+
+    <h2>Other Methods</h2>
+    <p>
+        There are two methods I didn't mention in this post: <b>Geometry shaders</b> and <b>Mesh shaders</b>.
+        Using geometry shaders is generally considered a bad idea because performance can vary significantly across platforms.
+        Mesh shaders are more complex to work with and are only compatible with newer graphics cards (RTX 20xx series or later).
+        Use mesh shaders only if you exclusively target newer hardware.
+    </p>
+
+    <h2>Links</h2>
+    <p>
+        You can find the source code of the quad rendering benchmark <a href="https://github.com/c-chiniquy/quad-benchmark" target="_blank">Here</a>.
+    </p>
+
+    <div class="back-link">
+        <a href="../index.html">← Go Back</a>
+    </div>
+
+    <script src="../assets/prism/prism.js"></script>
+</body>
+</html>
