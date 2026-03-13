@@ -164,19 +164,19 @@
         What's nice about using a rendering abstraction layer is that it hides a lot of the D3D12 boilerplate.
     </p>
 
-<pre><code class="language-cpp">cmd.SetPipeline(pipeline);
-cmd.SetPrimitiveTopology(ig::Primitive::TriangleList);
+<pre><code class="language-cpp">cmd.SetPipeline(*pipeline); // Primitive topology used: TriangleList
 
 for (uint32_t i = 0; i < numQuads; i++)
 {
+    const Quad& q = quads[i];
     Vertex data[6] =
     {
-        {quad[i].x, quad[i].y, quad[i].color},
-        {quad[i].x + quad[i].width, quad[i].y, quad[i].color},
-        {quad[i].x, quad[i].y + quad[i].height, quad[i].color},
-        {quad[i].x, quad[i].y + quad[i].height, quad[i].color},
-        {quad[i].x + quad[i].width, quad[i].y, quad[i].color},
-        {quad[i].x + quad[i].width, quad[i].y + quad[i].height, quad[i].color},
+        {q.x,           q.y,            q.color},
+        {q.x + q.width, q.y,            q.color},
+        {q.x,           q.y + q.height, q.color},
+        {q.x,           q.y + q.height, q.color},
+        {q.x + q.width, q.y,            q.color},
+        {q.x + q.width, q.y + q.height, q.color},
     };
     cmd.SetTempVertexBuffer(&data, sizeof(data), sizeof(Vertex));
     cmd.Draw(6);
@@ -197,8 +197,7 @@ for (uint32_t i = 0; i < numQuads; i++)
 
 <pre><code class="language-cpp">// Initialization
 std::vector&lt;Vertex&gt; vertices = std::vector&lt;Vertex&gt;(numQuads * 6);
-ig::Buffer vertexBuffer;
-vertexBuffer.LoadAsVertexBuffer(context, sizeof(Vertex), numQuads * 6, ig::BufferUsage::Dynamic);
+std::unique_ptr&lt;ig::Buffer&gt; vertexBuffer = ig::Buffer::CreateVertexBuffer(context, sizeof(Vertex), numQuads * 6, ig::BufferUsage::Dynamic);
 
 ...
 
@@ -206,20 +205,20 @@ vertexBuffer.LoadAsVertexBuffer(context, sizeof(Vertex), numQuads * 6, ig::Buffe
 uint32_t currentVertex = 0;
 for (uint32_t i = 0; i < numQuads; i++)
 {
-	vertices[currentVertex] = { quad[i].x, quad[i].y, quad[i].color };
-	vertices[currentVertex + 1] = { quad[i].x + quad[i].width, quad[i].y, quad[i].color };
-	vertices[currentVertex + 2] = { quad[i].x, quad[i].y + quad[i].height, quad[i].color };
-	vertices[currentVertex + 3] = { quad[i].x, quad[i].y + quad[i].height, quad[i].color };
-	vertices[currentVertex + 4] = { quad[i].x + quad[i].width, quad[i].y, quad[i].color };
-	vertices[currentVertex + 5] = { quad[i].x + quad[i].width, quad[i].y + quad[i].height, quad[i].color };
-	currentVertex += 6;
+    const Quad& q = quads[i];
+    vertices[currentVertex]     = { q.x,           q.y,            q.color };
+    vertices[currentVertex + 1] = { q.x + q.width, q.y,            q.color };
+    vertices[currentVertex + 2] = { q.x,           q.y + q.height, q.color };
+    vertices[currentVertex + 3] = { q.x,           q.y + q.height, q.color };
+    vertices[currentVertex + 4] = { q.x + q.width, q.y,            q.color };
+    vertices[currentVertex + 5] = { q.x + q.width, q.y + q.height, q.color };
+    currentVertex += 6;
 }
-vertexBuffer.SetDynamicData(vertices.data());
+vertexBuffer-&gt;SetDynamicData(vertices.data());
 
-cmd.SetPipeline(pipeline);
-cmd.SetVertexBuffer(vertexBuffer);
-cmd.SetPrimitiveTopology(ig::Primitive::TriangleList);
-cmd.Draw(vertexBuffer.GetNumElements());
+cmd.SetPipeline(*pipeline); // Primitive topology used: TriangleList
+cmd.SetVertexBuffer(*vertexBuffer);
+cmd.Draw(vertexBuffer-&gt;GetNumElements());
 </code></pre>
 
     <p>
@@ -249,10 +248,8 @@ cmd.Draw(vertexBuffer.GetNumElements());
 std::vector&lt;Vertex&gt; vertices = std::vector&lt;Vertex&gt;(numQuads * 4);
 std::vector&lt;uint32_t&gt; indices = std::vector&lt;uint32_t&gt;(numQuads * 6);
 
-ig::Buffer vertexBuffer;
-ig::Buffer indexBuffer;
-vertexBuffer.LoadAsVertexBuffer(context, sizeof(Vertex), numQuads * 4, ig::BufferUsage::Dynamic);
-indexBuffer.LoadAsIndexBuffer(context, ig::IndexFormat::UINT32, numQuads * 6, ig::BufferUsage::Dynamic);
+std::unique_ptr&lt;ig::Buffer&gt; vertexBuffer = ig::Buffer::CreateVertexBuffer(context, sizeof(Vertex), numQuads * 4, ig::BufferUsage::Dynamic);
+std::unique_ptr&lt;ig::Buffer&gt; indexBuffer = ig::Buffer::CreateIndexBuffer(context, ig::IndexFormat::UINT32, numQuads * 6, ig::BufferUsage::Dynamic);
 
 ...
 
@@ -261,30 +258,30 @@ uint32_t currentVertex = 0;
 uint32_t currentIndex = 0;
 for (uint32_t i = 0; i < numQuads; i++)
 {
-	vertices[currentVertex] = { quad[i].x, quad[i].y, quad[i].color };
-	vertices[currentVertex + 1] = { quad[i].x + quad[i].width, quad[i].y, quad[i].color };
-	vertices[currentVertex + 2] = { quad[i].x, quad[i].y + quad[i].height, quad[i].color };
-	vertices[currentVertex + 3] = { quad[i].x + quad[i].width, quad[i].y + quad[i].height, quad[i].color };
+    const Quad& q = quads[i];
+    vertices[currentVertex]     = { q.x,           q.y,            q.color };
+    vertices[currentVertex + 1] = { q.x + q.width, q.y,            q.color };
+    vertices[currentVertex + 2] = { q.x,           q.y + q.height, q.color };
+    vertices[currentVertex + 3] = { q.x + q.width, q.y + q.height, q.color };
 
-	uint32_t baseVertex = currentVertex;
-	indices[currentIndex] = baseVertex;
-	indices[currentIndex + 1] = baseVertex + 1;
-	indices[currentIndex + 2] = baseVertex + 2;
-	indices[currentIndex + 3] = baseVertex + 2;
-	indices[currentIndex + 4] = baseVertex + 1;
-	indices[currentIndex + 5] = baseVertex + 3;
+    uint32_t baseVertex = currentVertex;
+    indices[currentIndex] = baseVertex;
+    indices[currentIndex + 1] = baseVertex + 1;
+    indices[currentIndex + 2] = baseVertex + 2;
+    indices[currentIndex + 3] = baseVertex + 2;
+    indices[currentIndex + 4] = baseVertex + 1;
+    indices[currentIndex + 5] = baseVertex + 3;
 
-	currentVertex += 4;
-	currentIndex += 6;
+    currentVertex += 4;
+    currentIndex += 6;
 }
-vertexBuffer.SetDynamicData(vertices.data());
-indexBuffer.SetDynamicData(indices.data());
+vertexBuffer-&gt;SetDynamicData(vertices.data());
+indexBuffer-&gt;SetDynamicData(indices.data());
 
-cmd.SetPipeline(pipeline);
-cmd.SetVertexBuffer(vertexBuffer);
-cmd.SetIndexBuffer(indexBuffer);
-cmd.SetPrimitiveTopology(ig::Primitive::TriangleList);
-cmd.DrawIndexed(indexBuffer.GetNumElements());
+cmd.SetPipeline(*pipeline); // Primitive topology used: TriangleList
+cmd.SetVertexBuffer(*vertexBuffer);
+cmd.SetIndexBuffer(*indexBuffer);
+cmd.DrawIndexed(indexBuffer-&gt;GetNumElements());
 </code></pre>
     </details>
 
@@ -293,10 +290,10 @@ cmd.DrawIndexed(indexBuffer.GetNumElements());
 <pre><code class="language-cpp">// Initialization
 std::vector&lt;Vertex&gt; vertices = std::vector&lt;Vertex&gt;(numQuads * 4);
 
-vertexBuffer.LoadAsVertexBuffer(context, sizeof(Vertex), numQuads * 4, ig::BufferUsage::Dynamic);
-indexBuffer.LoadAsIndexBuffer(context, ig::IndexFormat::UINT32, numQuads * 6, ig::BufferUsage::Default);
+std::unique_ptr&lt;ig::Buffer&gt; vertexBuffer = ig::Buffer::CreateVertexBuffer(context, sizeof(Vertex), numQuads * 4, ig::BufferUsage::Dynamic);
+std::unique_ptr&lt;ig::Buffer&gt; indexBuffer = ig::Buffer::CreateIndexBuffer(context, ig::IndexFormat::UINT32, numQuads * 6, ig::BufferUsage::Default);
 
-// Populate the index buffer at initialization.
+// Populate the index buffer at initialization
 std::vector&lt;uint32_t&gt; indices(numQuads * 6);
 for (uint32_t quadIndex = 0; quadIndex < numQuads; quadIndex++)
 {
@@ -310,7 +307,7 @@ for (uint32_t quadIndex = 0; quadIndex < numQuads; quadIndex++)
 	indices[indexOffset + 4] = baseVertex + 1;
 	indices[indexOffset + 5] = baseVertex + 3;
 }
-indexBuffer.SetData(cmd, indices.data());
+indexBuffer-&gt;SetData(cmd, indices.data());
 
 ...
 
@@ -318,19 +315,19 @@ indexBuffer.SetData(cmd, indices.data());
 uint32_t currentVertex = 0;
 for (uint32_t i = 0; i < numQuads; i++)
 {
-	vertices[currentVertex] = { quad[i].x, quad[i].y, quad[i].color };
-	vertices[currentVertex + 1] = { quad[i].x + quad[i].width, quad[i].y, quad[i].color };
-	vertices[currentVertex + 2] = { quad[i].x, quad[i].y + quad[i].height, quad[i].color };
-	vertices[currentVertex + 3] = { quad[i].x + quad[i].width, quad[i].y + quad[i].height, quad[i].color };
-	currentVertex += 4;
+    const Quad& q = quads[i];
+    vertices[currentVertex]     = { q.x,           q.y,            q.color };
+    vertices[currentVertex + 1] = { q.x + q.width, q.y,            q.color };
+    vertices[currentVertex + 2] = { q.x,           q.y + q.height, q.color };
+    vertices[currentVertex + 3] = { q.x + q.width, q.y + q.height, q.color };
+    currentVertex += 4;
 }
-vertexBuffer.SetDynamicData(vertices.data());
+vertexBuffer-&gt;SetDynamicData(vertices.data());
 
-cmd.SetPipeline(pipeline);
-cmd.SetVertexBuffer(vertexBuffer);
-cmd.SetIndexBuffer(indexBuffer);
-cmd.SetPrimitiveTopology(ig::Primitive::TriangleList);
-cmd.DrawIndexed(indexBuffer.GetNumElements());
+cmd.SetPipeline(*pipeline); // Primitive topology used: TriangleList
+cmd.SetVertexBuffer(*vertexBuffer);
+cmd.SetIndexBuffer(*indexBuffer);
+cmd.DrawIndexed(indexBuffer-&gt;GetNumElements());
 </code></pre>
     </details>
 
@@ -492,7 +489,7 @@ PixelInput VSMain(Quad quad, uint vertexID : SV_VertexID)
     <details>
         <summary>Instancing code (API)</summary>
 <pre><code class="language-cpp">// Initialization
-ig::Buffer vertexBuffer.LoadAsVertexBuffer(context, sizeof(Quad), numQuads, ig::BufferUsage::Dynamic);
+std::unique_ptr&lt;ig::Buffer&gt; vertexBuffer = ig::Buffer::CreateVertexBuffer(context, sizeof(Quad), numQuads, ig::BufferUsage::Dynamic);
 
 const std::vector&lt;ig::VertexElement&gt; vertexLayout =
 {
@@ -502,20 +499,21 @@ const std::vector&lt;ig::VertexElement&gt; vertexLayout =
 	ig::VertexElement(ig::Format::BYTE_BYTE_BYTE_BYTE, "COLOR", 0, 0, ig::InputClass::PerInstance, 1),
 };
 
-ig::PipelineDesc desc;
-// ...set all renderstates here...
-desc.primitiveTopology = ig::Primitive::TriangleStrip; // Use triangle strips
-desc.vertexLayout = vertexLayout; // Use a per-instance vertex layout
-pipeline.Load(context, desc);
+ig::PipelineDesc desc =
+{
+    .primitiveTopology = ig::Primitive::TriangleStrip; // Use triangle strips
+    .vertexLayout = vertexLayout; // Use a per-instance vertex layout
+    // ...set the rest of the renderstates...
+};
+std::unique_ptr&lt;ig::Pipeline&gt; pipeline = ig::Pipeline::CreateGraphics(context, desc); // Create graphics pipeline
 
 ...
 
 // Rendering
-vertexBuffer.SetDynamicData((void*)quad); // Populates the vertex buffer with per-instance data
+vertexBuffer-&gt;SetDynamicData((void*)quads); // Populate the vertex buffer with per-instance data
 
-cmd.SetPipeline(pipeline);
-cmd.SetVertexBuffer(vertexBuffer);
-cmd.SetPrimitiveTopology(ig::Primitive::TriangleStrip);
+cmd.SetPipeline(*pipeline);
+cmd.SetVertexBuffer(*vertexBuffer);
 cmd.DrawInstanced(4, numQuads);
 </code></pre>
     </details>
