@@ -501,8 +501,8 @@ const std::vector&lt;ig::VertexElement&gt; vertexLayout =
 
 ig::PipelineDesc desc =
 {
-    .primitiveTopology = ig::Primitive::TriangleStrip; // Use triangle strips
-    .vertexLayout = vertexLayout; // Use a per-instance vertex layout
+    .primitiveTopology = ig::Primitive::TriangleStrip, // Use triangle strips
+    .vertexLayout = vertexLayout, // Use a per-instance vertex layout
     // ...set the rest of the renderstates...
 };
 std::unique_ptr&lt;ig::Pipeline&gt; pipeline = ig::Pipeline::CreateGraphics(context, desc); // Create graphics pipeline
